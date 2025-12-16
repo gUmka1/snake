@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Snake Telegram Mini App</title>
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style>
+    body {
+        background-color: #0f172a;
+        color: #f8fafc;
+        font-family: 'Courier New', Courier, monospace;
+        touch-action: none;
+        overflow: hidden;
+    }
+    canvas {
+        image-rendering: pixelated;
+        border: 4px solid #334155;
+        background-color: #1e293b;
+        box-shadow: 0 0 20px rgba(0, 255, 157, 0.2);
+    }
+    .btn-control {
+        background: #334155;
+        width: 60px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        font-size: 24px;
+        user-select: none;
+        touch-action: manipulation;
+    }
+    .btn-control:active {
+        background: #475569;
+        transform: scale(0.95);
+    }
+</style>
+</head>
+<body class="flex flex-col items-center justify-between min-h-screen p-4">
+
+<!-- Header / Score -->
+<div class="w-full max-w-md flex justify-between items-center mb-4">
+    <div class="text-xl font-bold">ЗМЕЙКА 🐍</div>
+    <div class="text-xl font-bold text-green-400">Счёт: <span id="score">0</span></div>
+</div>
+
+<!-- Game Canvas -->
+<div class="relative flex-grow flex items-center justify-center w-full">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Game Over Overlay -->
+    <div id="gameOver" class="hidden absolute inset-0 bg-black/80 flex flex-col items-center justify-center text-center p-6 z-10">
+        <h2 class="text-4xl font-black text-red-500 mb-2">ИГРА ОКОНЧЕНА</h2>
+        <p class="text-lg mb-6" id="finalScore">Твой результат: 0</p>
+        <input id="playerNameInput" type="text" placeholder="Ваш ник" class="mb-4 p-2 rounded text-black"/>
+        <button onclick="resetGame()" class="bg-green-500 hover:bg-green-600 text-black font-bold py-3 px-8 rounded-full transition-transform active:scale-95">
+            ИГРАТЬ СНОВА
+        </button>
+        <div id="leaderboard" class="mt-6 text-slate-300 text-sm text-left w-full max-w-xs"></div>
+    </div>
+
+    <!-- Start Overlay -->
+    <div id="startScreen" class="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center text-center p-6 z-10">
+        <div class="mb-6 animate-bounce">
+            <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 8.5c.5-1 2-1.5 4-1.5s3.5.5 4 1.5c1 2 1 4.5 0 6.5-.5 1-2 1.5-4 1.5s-3.5-.5-4-1.5c-1-2-1-4.5 0-6.5Z"/><path d="M11 11.5h.01"/><path d="M13 11.5h.01"/><path d="M18.5 10c1.5 0 3 1.5 3 3s-1.5 3-3 3c-1.5 0-2-1-2-1"/></svg>
+        </div>
+        <h1 class="text-3xl font-bold mb-4">ГОТОВ?</h1>
+        <button onclick="startGame()" class="bg-green-500 hover:bg-green-600 text-black font-bold py-3 px-12 rounded-full text-xl shadow-lg shadow-green-500/20">
+            СТАРТ
+        </button>
+    </div>
+</div>
+
+<!-- Mobile Controls -->
+<div class="grid grid-cols-3 gap-2 mt-8 mb-4 max-w-xs mx-auto md:hidden">
+    <div></div>
+    <div class="btn-control" id="btn-up">↑</div>
+    <div></div>
+    <div class="btn-control" id="btn-left">←</div>
+    <div class="btn-control" id="btn-down">↓</div>
+    <div class="btn-control" id="btn-right">→</div>
+</div>
+
+<!-- Desktop Help -->
+<div class="hidden md:block text-slate-500 text-sm mt-4">
+    Используй стрелочки на клавиатуре
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreElement = document.getElementById('score');
+const finalScoreElement = document.getElementById('finalScore');
+const gameOverOverlay = document.getElementById('gameOver');
+const startScreen = document.getElementById('startScreen');
+const leaderboard = document.getElementById('leaderboard');
+const playerNameInput = document.getElementById('playerNameInput');
+
+const gridSize = 20;
+let tileCount;
+let snake = [];
+let food = { x: 5, y: 5 };
+let dx = 0, dy = 0;
+let score = 0, speed = 150, gameLoop;
+
+let snakeColor = getRandomColor();
+function getRandomColor() {
+    const r = Math.floor(Math.random() * 200 + 30);
+    const g = Math.floor(Math.random() * 200 + 30);
+    const b = Math.floor(Math.random() * 200 + 30);
+    return `rgb(${r},${g},${b})`;
+}
+
+// Telegram mini app setup
+if(window.Telegram?.WebApp) {
+    Telegram.WebApp.ready();
+    Telegram.WebApp.expand();
+    Telegram.WebApp.disableVerticalSwipes();
+}
+
+// Head image
+const headImg = new Image();
+headImg.src = 'https://example.com/your-head.png'; // замените на свою картинку
+
+function resize() {
+    const size = Math.min(window.innerWidth - 40, 400);
+    canvas.width = size;
+    canvas.height = size;
+    tileCount = Math.floor(canvas.width / gridSize);
+}
+window.addEventListener('resize', resize);
+resize();
+
+function initGame() {
+    snake = [
+        { x: Math.floor(tileCount/2), y: Math.floor(tileCount/2) },
+        { x: Math.floor(tileCount/2), y: Math.floor(tileCount/2) + 1 },
+        { x: Math.floor(tileCount/2), y: Math.floor(tileCount/2) + 2 }
+    ];
+    dx = 0; dy = -1;
+    score = 0;
+    speed = 150;
+    snakeColor = getRandomColor();
+    scoreElement.innerText = score;
+}
+
+function startGame() {
+    startScreen.classList.add('hidden');
+    gameOverOverlay.classList.add('hidden');
+    initGame();
+    if(gameLoop) clearInterval(gameLoop);
+    gameLoop = setInterval(draw, speed);
+}
+
+function resetGame() { startGame(); }
+
+function draw() {
+    moveSnake();
+    if(checkGameOver()) { endGame(); return; }
+    checkFoodCollision();
+
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    // Food
+    ctx.fillStyle = '#f43f5e';
+    ctx.beginPath();
+    ctx.roundRect(food.x*gridSize+2, food.y*gridSize+2, gridSize-4, gridSize-4, 4);
+    ctx.fill();
+
+    // Snake
+    snake.forEach((part,index)=>{
+        if(index===0) {
+            ctx.drawImage(headImg, part.x*gridSize, part.y*gridSize, gridSize, gridSize);
+        } else {
+            ctx.fillStyle = snakeColor;
+            ctx.beginPath();
+            ctx.roundRect(part.x*gridSize+1, part.y*gridSize+1, gridSize-2, gridSize-2, 4);
+            ctx.fill();
+        }
+    });
+}
+
+function moveSnake() {
+    const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+    snake.unshift(head);
+    snake.pop();
+}
+
+function checkGameOver() {
+    const head = snake[0];
+    if(head.x<0 || head.x>=tileCount || head.y<0 || head.y>=tileCount) return true;
+    for(let i=1;i<snake.length;i++) if(head.x===snake[i].x && head.y===snake[i].y) return true;
+    return false;
+}
+
+function checkFoodCollision() {
+    const head = snake[0];
+    if(head.x===food.x && head.y===food.y) {
+        score+=10; scoreElement.innerText = score;
+        snake.push({...snake[snake.length-1]});
+        spawnFood();
+        if(score%50===0) snakeColor = getRandomColor();
+        if(speed>70){ clearInterval(gameLoop); speed-=2; gameLoop=setInterval(draw,speed); }
+    }
+}
+
+function spawnFood() {
+    food = { x: Math.floor(Math.random()*tileCount), y: Math.floor(Math.random()*tileCount) };
+    snake.forEach(p=>{ if(p.x===food.x && p.y===food.y) spawnFood(); });
+}
+
+function endGame() {
+    clearInterval(gameLoop);
+    gameOverOverlay.classList.remove('hidden');
+    finalScoreElement.innerText = `Твой результат: ${score}`;
+
+    // Save top in localStorage
+    let top = JSON.parse(localStorage.getItem('snakeTop')||'[]');
+    let name = playerNameInput.value.trim() || 'Гость';
+    top.push({name,score});
+    top.sort((a,b)=>b.score-a.score);
+    top = top.slice(0,10);
+    localStorage.setItem('snakeTop', JSON.stringify(top));
+
+    displayTop(top);
+
+    if(window.Telegram?.WebApp) Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+}
+
+function displayTop(top){
+    leaderboard.innerHTML = `<h3 class="text-lg mb-2 font-bold">🏆 ТОП 10</h3>` +
+        top.map((p,i)=>`<div>${i+1}. ${p.name} — ${p.score}</div>`).join('');
+}
+
+// Controls
+function changeDirection(newDx,newDy){
+    if((newDx===-dx && newDx!==0)||(newDy===-dy && newDy!==0)) return;
+    dx=newDx; dy=newDy;
+}
+
+window.addEventListener('keydown',e=>{
+    switch(e.key){
+        case 'ArrowUp': changeDirection(0,-1); break;
+        case 'ArrowDown': changeDirection(0,1); break;
+        case 'ArrowLeft': changeDirection(-1,0); break;
+        case 'ArrowRight': changeDirection(1,0); break;
+    }
+});
+
+['up','down','left','right'].forEach(dir=>{
+    document.getElementById('btn-'+dir).addEventListener('touchstart',e=>{ e.preventDefault(); 
+        if(dir==='up') changeDirection(0,-1);
+        if(dir==='down') changeDirection(0,1);
+        if(dir==='left') changeDirection(-1,0);
+        if(dir==='right') changeDirection(1,0);
+    });
+    document.getElementById('btn-'+dir).addEventListener('mousedown',()=>{
+        if(dir==='up') changeDirection(0,-1);
+        if(dir==='down') changeDirection(0,1);
+        if(dir==='left') changeDirection(-1,0);
+        if(dir==='right') changeDirection(1,0);
+    });
+});
+
+// Load top on start
+document.addEventListener('DOMContentLoaded', ()=>{
+    let top = JSON.parse(localStorage.getItem('snakeTop')||'[]');
+    displayTop(top);
+});
+</script>
+</body>
+</html>
