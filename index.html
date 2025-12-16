@@ -39,6 +39,30 @@
         opacity: 0.5;
         cursor: not-allowed;
     }
+    /* Новый стиль формы */
+    #playerNameInput {
+        background-color: #4ade80; /* ярко-зеленый */
+        color: #000000; /* черный текст */
+        font-size: 1.5rem; /* крупный шрифт */
+        font-weight: bold;
+        padding: 0.75rem 1rem;
+        border-radius: 12px;
+        width: 280px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        border: none;
+        outline: none;
+        text-align: center;
+    }
+    #startBtn {
+        font-size: 1.5rem;
+        padding: 0.75rem 1.5rem;
+        border-radius: 12px;
+        font-weight: bold;
+        box-shadow: 0 6px 20px rgba(0, 255, 0, 0.5);
+    }
+    #startBtn:hover:not(:disabled) {
+        background-color: #22c55e;
+    }
 </style>
 </head>
 <body class="flex flex-col items-center justify-between min-h-screen p-4">
@@ -61,13 +85,13 @@
     </div>
 
     <div id="startScreen" class="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center text-center p-6 z-10">
-        <div class="mb-4">
-            <input id="playerNameInput" type="text" placeholder="Введите имя игрока" class="p-2 rounded text-black w-64" />
+        <div class="mb-6">
+            <input id="playerNameInput" type="text" placeholder="Введите имя игрока" />
         </div>
         <div class="mb-6 animate-bounce">
             <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 8.5c.5-1 2-1.5 4-1.5s3.5.5 4 1.5c1 2 1 4.5 0 6.5-.5 1-2 1.5-4 1.5s-3.5-.5-4-1.5c-1-2-1-4.5 0-6.5Z"/><path d="M11 11.5h.01"/><path d="M13 11.5h.01"/><path d="M18.5 10c1.5 0 3 1.5 3 3s-1.5 3-3 3c-1.5 0-2-1-2-1"/></svg>
         </div>
-        <button id="startBtn" disabled class="bg-green-500 hover:bg-green-600 text-black font-bold py-3 px-12 rounded-full text-xl shadow-lg shadow-green-500/20">
+        <button id="startBtn" disabled>
             СТАРТ
         </button>
     </div>
@@ -87,6 +111,7 @@
 </div>
 
 <script>
+// --- код игры без изменений ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const scoreElement = document.getElementById('score');
@@ -113,16 +138,14 @@ function getRandomColor() {
     return `rgb(${r},${g},${b})`;
 }
 
-// Telegram mini app setup
 if(window.Telegram?.WebApp){
     Telegram.WebApp.ready();
     Telegram.WebApp.expand();
     Telegram.WebApp.disableVerticalSwipes();
 }
 
-// Head image
 const headImg = new Image();
-headImg.src = 'head.png'; // в корне
+headImg.src = 'head.png';
 let headLoaded = false;
 headImg.onload = () => headLoaded = true;
 
@@ -163,25 +186,18 @@ function draw() {
     moveSnake();
     if(checkGameOver()){ endGame(); return; }
     checkFoodCollision();
-
     ctx.fillStyle = '#1e293b';
     ctx.fillRect(0,0,canvas.width,canvas.height);
 
-    // Food
     ctx.fillStyle = '#f43f5e';
     ctx.beginPath();
     ctx.roundRect(food.x*gridSize+2, food.y*gridSize+2, gridSize-4, gridSize-4, 4);
     ctx.fill();
 
-    // Snake
     snake.forEach((part,index)=>{
         if(index===0){
-            if(headLoaded){
-                ctx.drawImage(headImg, part.x*gridSize, part.y*gridSize, gridSize, gridSize);
-            } else {
-                ctx.fillStyle = '#4ade80';
-                ctx.fillRect(part.x*gridSize, part.y*gridSize, gridSize, gridSize);
-            }
+            if(headLoaded) ctx.drawImage(headImg, part.x*gridSize, part.y*gridSize, gridSize, gridSize);
+            else { ctx.fillStyle = '#4ade80'; ctx.fillRect(part.x*gridSize, part.y*gridSize, gridSize, gridSize); }
         } else {
             ctx.fillStyle = snakeColor;
             ctx.beginPath();
@@ -224,15 +240,12 @@ function endGame(){
     clearInterval(gameLoop);
     gameOverOverlay.classList.remove('hidden');
     finalScoreElement.innerText=`Твой результат: ${score}`;
-
-    // Save top in localStorage
     let top=JSON.parse(localStorage.getItem('snakeTop')||'[]');
     top.push({name:playerNameCurrent,score});
     top.sort((a,b)=>b.score-a.score);
     top=top.slice(0,10);
     localStorage.setItem('snakeTop', JSON.stringify(top));
     displayTop(top);
-
     if(window.Telegram?.WebApp) Telegram.WebApp.HapticFeedback.notificationOccurred('error');
 }
 
@@ -241,7 +254,6 @@ function displayTop(top){
         top.map((p,i)=>`<div>${i+1}. ${p.name} — ${p.score}</div>`).join('');
 }
 
-// Controls
 function changeDirection(newDx,newDy){
     if((newDx===-dx&&newDx!==0)||(newDy===-dy&&newDy!==0)) return;
     dx=newDx; dy=newDy;
@@ -271,15 +283,12 @@ window.addEventListener('keydown',e=>{
     });
 });
 
-// Enable start button only after name input
 playerNameInput.addEventListener('input',()=>{
     startBtn.disabled = playerNameInput.value.trim() === "";
 });
 
-// Start button click
 startBtn.addEventListener('click',startGame);
 
-// Load top on start
 document.addEventListener('DOMContentLoaded',()=>{
     let top=JSON.parse(localStorage.getItem('snakeTop')||'[]');
     displayTop(top);
