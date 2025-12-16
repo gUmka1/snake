@@ -35,6 +35,10 @@
         background: #475569;
         transform: scale(0.95);
     }
+    button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
 </style>
 </head>
 <body class="flex flex-col items-center justify-between min-h-screen p-4">
@@ -50,7 +54,6 @@
     <div id="gameOver" class="hidden absolute inset-0 bg-black/80 flex flex-col items-center justify-center text-center p-6 z-10">
         <h2 class="text-4xl font-black text-red-500 mb-2">ИГРА ОКОНЧЕНА</h2>
         <p class="text-lg mb-6" id="finalScore">Твой результат: 0</p>
-        <input id="playerNameInput" type="text" placeholder="Ваш ник" class="mb-4 p-2 rounded text-black"/>
         <button onclick="resetGame()" class="bg-green-500 hover:bg-green-600 text-black font-bold py-3 px-8 rounded-full transition-transform active:scale-95">
             ИГРАТЬ СНОВА
         </button>
@@ -58,11 +61,13 @@
     </div>
 
     <div id="startScreen" class="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center text-center p-6 z-10">
+        <div class="mb-4">
+            <input id="playerNameInput" type="text" placeholder="Введите имя игрока" class="p-2 rounded text-black w-64" />
+        </div>
         <div class="mb-6 animate-bounce">
             <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 8.5c.5-1 2-1.5 4-1.5s3.5.5 4 1.5c1 2 1 4.5 0 6.5-.5 1-2 1.5-4 1.5s-3.5-.5-4-1.5c-1-2-1-4.5 0-6.5Z"/><path d="M11 11.5h.01"/><path d="M13 11.5h.01"/><path d="M18.5 10c1.5 0 3 1.5 3 3s-1.5 3-3 3c-1.5 0-2-1-2-1"/></svg>
         </div>
-        <h1 class="text-3xl font-bold mb-4">ГОТОВ?</h1>
-        <button onclick="startGame()" class="bg-green-500 hover:bg-green-600 text-black font-bold py-3 px-12 rounded-full text-xl shadow-lg shadow-green-500/20">
+        <button id="startBtn" disabled class="bg-green-500 hover:bg-green-600 text-black font-bold py-3 px-12 rounded-full text-xl shadow-lg shadow-green-500/20">
             СТАРТ
         </button>
     </div>
@@ -90,6 +95,7 @@ const gameOverOverlay = document.getElementById('gameOver');
 const startScreen = document.getElementById('startScreen');
 const leaderboard = document.getElementById('leaderboard');
 const playerNameInput = document.getElementById('playerNameInput');
+const startBtn = document.getElementById('startBtn');
 
 const gridSize = 20;
 let tileCount;
@@ -97,12 +103,13 @@ let snake = [];
 let food = { x: 5, y: 5 };
 let dx = 0, dy = 0;
 let score = 0, speed = 150, gameLoop;
-
 let snakeColor = getRandomColor();
+let playerNameCurrent = "";
+
 function getRandomColor() {
-    const r = Math.floor(Math.random() * 200 + 30);
-    const g = Math.floor(Math.random() * 200 + 30);
-    const b = Math.floor(Math.random() * 200 + 30);
+    const r = Math.floor(Math.random()*200+30);
+    const g = Math.floor(Math.random()*200+30);
+    const b = Math.floor(Math.random()*200+30);
     return `rgb(${r},${g},${b})`;
 }
 
@@ -115,15 +122,15 @@ if(window.Telegram?.WebApp){
 
 // Head image
 const headImg = new Image();
-headImg.src = 'head.png'; // картинка головы в корне
+headImg.src = 'head.png'; // в корне
 let headLoaded = false;
 headImg.onload = () => headLoaded = true;
 
 function resize() {
-    const size = Math.min(window.innerWidth - 40, 400);
+    const size = Math.min(window.innerWidth-40,400);
     canvas.width = size;
     canvas.height = size;
-    tileCount = Math.floor(canvas.width / gridSize);
+    tileCount = Math.floor(canvas.width/gridSize);
 }
 window.addEventListener('resize', resize);
 resize();
@@ -131,8 +138,8 @@ resize();
 function initGame() {
     snake = [
         { x: Math.floor(tileCount/2), y: Math.floor(tileCount/2) },
-        { x: Math.floor(tileCount/2), y: Math.floor(tileCount/2) + 1 },
-        { x: Math.floor(tileCount/2), y: Math.floor(tileCount/2) + 2 }
+        { x: Math.floor(tileCount/2), y: Math.floor(tileCount/2)+1 },
+        { x: Math.floor(tileCount/2), y: Math.floor(tileCount/2)+2 }
     ];
     dx = 0; dy = -1;
     score = 0;
@@ -142,6 +149,7 @@ function initGame() {
 }
 
 function startGame() {
+    playerNameCurrent = playerNameInput.value.trim() || "Гость";
     startScreen.classList.add('hidden');
     gameOverOverlay.classList.add('hidden');
     initGame();
@@ -184,7 +192,7 @@ function draw() {
 }
 
 function moveSnake() {
-    const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+    const head = { x: snake[0].x+dx, y: snake[0].y+dy };
     snake.unshift(head);
     snake.pop();
 }
@@ -199,7 +207,7 @@ function checkGameOver() {
 function checkFoodCollision() {
     const head = snake[0];
     if(head.x===food.x && head.y===food.y){
-        score+=10; scoreElement.innerText=score;
+        score+=10; scoreElement.innerText = score;
         snake.push({...snake[snake.length-1]});
         spawnFood();
         if(score%50===0) snakeColor=getRandomColor();
@@ -217,9 +225,9 @@ function endGame(){
     gameOverOverlay.classList.remove('hidden');
     finalScoreElement.innerText=`Твой результат: ${score}`;
 
+    // Save top in localStorage
     let top=JSON.parse(localStorage.getItem('snakeTop')||'[]');
-    let name=playerNameInput.value.trim()||'Гость';
-    top.push({name,score});
+    top.push({name:playerNameCurrent,score});
     top.sort((a,b)=>b.score-a.score);
     top=top.slice(0,10);
     localStorage.setItem('snakeTop', JSON.stringify(top));
@@ -233,6 +241,7 @@ function displayTop(top){
         top.map((p,i)=>`<div>${i+1}. ${p.name} — ${p.score}</div>`).join('');
 }
 
+// Controls
 function changeDirection(newDx,newDy){
     if((newDx===-dx&&newDx!==0)||(newDy===-dy&&newDy!==0)) return;
     dx=newDx; dy=newDy;
@@ -262,6 +271,15 @@ window.addEventListener('keydown',e=>{
     });
 });
 
+// Enable start button only after name input
+playerNameInput.addEventListener('input',()=>{
+    startBtn.disabled = playerNameInput.value.trim() === "";
+});
+
+// Start button click
+startBtn.addEventListener('click',startGame);
+
+// Load top on start
 document.addEventListener('DOMContentLoaded',()=>{
     let top=JSON.parse(localStorage.getItem('snakeTop')||'[]');
     displayTop(top);
