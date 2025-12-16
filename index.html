@@ -39,17 +39,14 @@
 </head>
 <body class="flex flex-col items-center justify-between min-h-screen p-4">
 
-<!-- Header / Score -->
 <div class="w-full max-w-md flex justify-between items-center mb-4">
     <div class="text-xl font-bold">ЗМЕЙКА 🐍</div>
     <div class="text-xl font-bold text-green-400">Счёт: <span id="score">0</span></div>
 </div>
 
-<!-- Game Canvas -->
 <div class="relative flex-grow flex items-center justify-center w-full">
     <canvas id="gameCanvas"></canvas>
 
-    <!-- Game Over Overlay -->
     <div id="gameOver" class="hidden absolute inset-0 bg-black/80 flex flex-col items-center justify-center text-center p-6 z-10">
         <h2 class="text-4xl font-black text-red-500 mb-2">ИГРА ОКОНЧЕНА</h2>
         <p class="text-lg mb-6" id="finalScore">Твой результат: 0</p>
@@ -60,7 +57,6 @@
         <div id="leaderboard" class="mt-6 text-slate-300 text-sm text-left w-full max-w-xs"></div>
     </div>
 
-    <!-- Start Overlay -->
     <div id="startScreen" class="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center text-center p-6 z-10">
         <div class="mb-6 animate-bounce">
             <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 8.5c.5-1 2-1.5 4-1.5s3.5.5 4 1.5c1 2 1 4.5 0 6.5-.5 1-2 1.5-4 1.5s-3.5-.5-4-1.5c-1-2-1-4.5 0-6.5Z"/><path d="M11 11.5h.01"/><path d="M13 11.5h.01"/><path d="M18.5 10c1.5 0 3 1.5 3 3s-1.5 3-3 3c-1.5 0-2-1-2-1"/></svg>
@@ -72,7 +68,6 @@
     </div>
 </div>
 
-<!-- Mobile Controls -->
 <div class="grid grid-cols-3 gap-2 mt-8 mb-4 max-w-xs mx-auto md:hidden">
     <div></div>
     <div class="btn-control" id="btn-up">↑</div>
@@ -82,7 +77,6 @@
     <div class="btn-control" id="btn-right">→</div>
 </div>
 
-<!-- Desktop Help -->
 <div class="hidden md:block text-slate-500 text-sm mt-4">
     Используй стрелочки на клавиатуре
 </div>
@@ -113,7 +107,7 @@ function getRandomColor() {
 }
 
 // Telegram mini app setup
-if(window.Telegram?.WebApp) {
+if(window.Telegram?.WebApp){
     Telegram.WebApp.ready();
     Telegram.WebApp.expand();
     Telegram.WebApp.disableVerticalSwipes();
@@ -121,7 +115,9 @@ if(window.Telegram?.WebApp) {
 
 // Head image
 const headImg = new Image();
-headImg.src = 'https://iimg.su/i/ZGtX0p'; // замените на свою картинку
+headImg.src = 'head.png'; // картинка головы в корне
+let headLoaded = false;
+headImg.onload = () => headLoaded = true;
 
 function resize() {
     const size = Math.min(window.innerWidth - 40, 400);
@@ -157,7 +153,7 @@ function resetGame() { startGame(); }
 
 function draw() {
     moveSnake();
-    if(checkGameOver()) { endGame(); return; }
+    if(checkGameOver()){ endGame(); return; }
     checkFoodCollision();
 
     ctx.fillStyle = '#1e293b';
@@ -171,8 +167,13 @@ function draw() {
 
     // Snake
     snake.forEach((part,index)=>{
-        if(index===0) {
-            ctx.drawImage(headImg, part.x*gridSize, part.y*gridSize, gridSize, gridSize);
+        if(index===0){
+            if(headLoaded){
+                ctx.drawImage(headImg, part.x*gridSize, part.y*gridSize, gridSize, gridSize);
+            } else {
+                ctx.fillStyle = '#4ade80';
+                ctx.fillRect(part.x*gridSize, part.y*gridSize, gridSize, gridSize);
+            }
         } else {
             ctx.fillStyle = snakeColor;
             ctx.beginPath();
@@ -190,53 +191,50 @@ function moveSnake() {
 
 function checkGameOver() {
     const head = snake[0];
-    if(head.x<0 || head.x>=tileCount || head.y<0 || head.y>=tileCount) return true;
+    if(head.x<0||head.x>=tileCount||head.y<0||head.y>=tileCount) return true;
     for(let i=1;i<snake.length;i++) if(head.x===snake[i].x && head.y===snake[i].y) return true;
     return false;
 }
 
 function checkFoodCollision() {
     const head = snake[0];
-    if(head.x===food.x && head.y===food.y) {
-        score+=10; scoreElement.innerText = score;
+    if(head.x===food.x && head.y===food.y){
+        score+=10; scoreElement.innerText=score;
         snake.push({...snake[snake.length-1]});
         spawnFood();
-        if(score%50===0) snakeColor = getRandomColor();
+        if(score%50===0) snakeColor=getRandomColor();
         if(speed>70){ clearInterval(gameLoop); speed-=2; gameLoop=setInterval(draw,speed); }
     }
 }
 
-function spawnFood() {
-    food = { x: Math.floor(Math.random()*tileCount), y: Math.floor(Math.random()*tileCount) };
-    snake.forEach(p=>{ if(p.x===food.x && p.y===food.y) spawnFood(); });
+function spawnFood(){
+    food={x:Math.floor(Math.random()*tileCount),y:Math.floor(Math.random()*tileCount)};
+    snake.forEach(p=>{if(p.x===food.x && p.y===food.y) spawnFood();});
 }
 
-function endGame() {
+function endGame(){
     clearInterval(gameLoop);
     gameOverOverlay.classList.remove('hidden');
-    finalScoreElement.innerText = `Твой результат: ${score}`;
+    finalScoreElement.innerText=`Твой результат: ${score}`;
 
-    // Save top in localStorage
-    let top = JSON.parse(localStorage.getItem('snakeTop')||'[]');
-    let name = playerNameInput.value.trim() || 'Гость';
+    let top=JSON.parse(localStorage.getItem('snakeTop')||'[]');
+    let name=playerNameInput.value.trim()||'Гость';
     top.push({name,score});
     top.sort((a,b)=>b.score-a.score);
-    top = top.slice(0,10);
+    top=top.slice(0,10);
     localStorage.setItem('snakeTop', JSON.stringify(top));
-
     displayTop(top);
 
     if(window.Telegram?.WebApp) Telegram.WebApp.HapticFeedback.notificationOccurred('error');
 }
 
 function displayTop(top){
-    leaderboard.innerHTML = `<h3 class="text-lg mb-2 font-bold">🏆 ТОП 10</h3>` +
+    leaderboard.innerHTML=`<h3 class="text-lg mb-2 font-bold">🏆 ТОП 10</h3>` +
         top.map((p,i)=>`<div>${i+1}. ${p.name} — ${p.score}</div>`).join('');
 }
 
-// Controls
 function changeDirection(newDx,newDy){
-    if((newDx===-dx && newDx!==0)||(newDy===-dy && newDy!==0)) return;
+    if((newDx===-dx&&newDx!==0)||(newDy===-dy&&newDy!==0)) return;
     dx=newDx; dy=newDy;
 }
 
@@ -250,7 +248,7 @@ window.addEventListener('keydown',e=>{
 });
 
 ['up','down','left','right'].forEach(dir=>{
-    document.getElementById('btn-'+dir).addEventListener('touchstart',e=>{ e.preventDefault(); 
+    document.getElementById('btn-'+dir).addEventListener('touchstart',e=>{e.preventDefault();
         if(dir==='up') changeDirection(0,-1);
         if(dir==='down') changeDirection(0,1);
         if(dir==='left') changeDirection(-1,0);
@@ -264,9 +262,8 @@ window.addEventListener('keydown',e=>{
     });
 });
 
-// Load top on start
-document.addEventListener('DOMContentLoaded', ()=>{
-    let top = JSON.parse(localStorage.getItem('snakeTop')||'[]');
+document.addEventListener('DOMContentLoaded',()=>{
+    let top=JSON.parse(localStorage.getItem('snakeTop')||'[]');
     displayTop(top);
 });
 </script>
